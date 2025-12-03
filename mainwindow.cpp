@@ -1,63 +1,54 @@
 #include "mainwindow.h"
-#include <QTableWidget>
+#include "ui_mainwindow.h"
 #include <QMenuBar>
 #include <QMenu>
-#include <QHeaderView>
-#include <QVBoxLayout>
-#include <QWidget>
 #include <QInputDialog>
 #include <QMessageBox>
+#include <QHeaderView>
+#include <QFileDialog>
+#include <QFile>
+#include <QTextStream>
+#include <QCloseEvent>  // Добавлено
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
-    , table(nullptr)
+    , ui(new Ui::MainWindow)
 {
-    setupUI();
-    setupTable();
-}
+    ui->setupUi(this);
 
-void MainWindow::setupUI()
-{
-    QWidget *centralWidget = new QWidget(this);
+    ui->tableWidget->horizontalHeader()->setStretchLastSection(false);
+    ui->tableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    ui->tableWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
-    table = new QTableWidget(centralWidget);
-    table->setSelectionBehavior(QAbstractItemView::SelectRows);
-    table->setSelectionMode(QAbstractItemView::SingleSelection);
-
-    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
-    mainLayout->addWidget(table);
-
-    setCentralWidget(centralWidget);
-
+    QMenu *fileMenu = menuBar()->addMenu("Файл");
     QMenu *productsMenu = menuBar()->addMenu("Товары");
     QMenu *helpMenu = menuBar()->addMenu("Справка");
 
+    QAction *saveAction = fileMenu->addAction("Сохранить в файл");
+    QAction *loadAction = fileMenu->addAction("Загрузить из файла");
     QAction *addAction = productsMenu->addAction("Добавить товар");
     QAction *editAction = productsMenu->addAction("Редактировать товар");
     QAction *deleteAction = productsMenu->addAction("Удалить товар");
     QAction *helpAction = helpMenu->addAction("О программе");
 
+    connect(saveAction, &QAction::triggered, this, &MainWindow::saveToFile);
+    connect(loadAction, &QAction::triggered, this, &MainWindow::loadFromFile);
     connect(addAction, &QAction::triggered, this, &MainWindow::addProduct);
     connect(editAction, &QAction::triggered, this, &MainWindow::editProduct);
     connect(deleteAction, &QAction::triggered, this, &MainWindow::deleteProduct);
-    connect(helpAction, &QAction::triggered, this, &MainWindow::help);
+    connect(helpAction, &QAction::triggered, this, &MainWindow::showHelp);
 
-    resize(1280, 720);
+    addAction->setShortcut(QKeySequence("Ctrl+N"));
+    editAction->setShortcut(QKeySequence("Ctrl+E"));
+    deleteAction->setShortcut(QKeySequence::Delete);
+    helpAction->setShortcut(QKeySequence("F1"));
+    loadAction->setShortcut(QKeySequence::Open);
+    saveAction->setShortcut(QKeySequence::Save);
 }
 
-void MainWindow::setupTable()
+MainWindow::~MainWindow()
 {
-    table->setColumnCount(8);
-
-    QStringList headers;
-    headers << "Товар" << "Поставщик" << "Прибыло на склад, шт" << "Продано, шт"<< "Всего на складе, шт" << "Цена, р" << "Общая цена товара на складе, р" << "Выручка с продажи, р";
-    table->setHorizontalHeaderLabels(headers);
-
-    table->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
-    table->resizeColumnsToContents();
-
-    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    table->setRowCount(0);
+    delete ui;
 }
 
 void MainWindow::addProduct()
@@ -82,43 +73,56 @@ void MainWindow::addProduct()
     int totalPrice = totalInStock * price;
     int revenue = sold * price;
 
-    int row = table->rowCount();
-    table->insertRow(row);
+    int row = ui->tableWidget->rowCount();
+    ui->tableWidget->insertRow(row);
 
-    table->setItem(row, 0, new QTableWidgetItem(product));
-    table->setItem(row, 1, new QTableWidgetItem(supplier));
-    table->setItem(row, 2, new QTableWidgetItem(QString::number(received)));
-    table->setItem(row, 3, new QTableWidgetItem(QString::number(sold)));
-    table->setItem(row, 4, new QTableWidgetItem(QString::number(totalInStock)));
-    table->setItem(row, 5, new QTableWidgetItem(QString::number(price)));
-    table->setItem(row, 6, new QTableWidgetItem(QString::number(totalPrice)));
-    table->setItem(row, 7, new QTableWidgetItem(QString::number(revenue)));
+    ui->tableWidget->setItem(row, 0, new QTableWidgetItem(product));
+    ui->tableWidget->setItem(row, 1, new QTableWidgetItem(supplier));
+    ui->tableWidget->setItem(row, 2, new QTableWidgetItem(QString::number(received)));
+    ui->tableWidget->setItem(row, 3, new QTableWidgetItem(QString::number(sold)));
+    ui->tableWidget->setItem(row, 4, new QTableWidgetItem(QString::number(totalInStock)));
+    ui->tableWidget->setItem(row, 5, new QTableWidgetItem(QString::number(price)));
+    ui->tableWidget->setItem(row, 6, new QTableWidgetItem(QString::number(totalPrice)));
+    ui->tableWidget->setItem(row, 7, new QTableWidgetItem(QString::number(revenue)));
+
+    markDataChanged();
 }
 
 void MainWindow::deleteProduct()
 {
-    int currentRow = table->currentRow();
+    int currentRow = ui->tableWidget->currentRow();
     if (currentRow == -1) {
         QMessageBox::warning(this, "Ошибка", "Выберите товар для удаления!");
         return;
     }
 
-    table->removeRow(currentRow);
+    QString productName = ui->tableWidget->item(currentRow, 0)->text();
+
+    QMessageBox::StandardButton reply;
+    reply = QMessageBox::question(this, "Подтверждение удаления",
+                                  "Вы уверены, что хотите удалить товар:\n\"" + productName + "\"?",
+                                  QMessageBox::Yes | QMessageBox::No);
+
+    if (reply == QMessageBox::Yes) {
+        ui->tableWidget->removeRow(currentRow);
+        markDataChanged();
+        QMessageBox::information(this, "Успех!", "Данные удалены!");
+    }
 }
 
 void MainWindow::editProduct()
 {
-    int currentRow = table->currentRow();
+    int currentRow = ui->tableWidget->currentRow();
     if (currentRow == -1) {
         QMessageBox::warning(this, "Ошибка", "Выберите товар для редактирования!");
         return;
     }
 
-    QString currentProduct = table->item(currentRow, 0)->text();
-    QString currentSupplier = table->item(currentRow, 1)->text();
-    int currentReceived = table->item(currentRow, 2)->text().toInt();
-    int currentSold = table->item(currentRow, 3)->text().toInt();
-    int currentPrice = table->item(currentRow, 5)->text().toInt();
+    QString currentProduct = ui->tableWidget->item(currentRow, 0)->text();
+    QString currentSupplier = ui->tableWidget->item(currentRow, 1)->text();
+    int currentReceived = ui->tableWidget->item(currentRow, 2)->text().toInt();
+    int currentSold = ui->tableWidget->item(currentRow, 3)->text().toInt();
+    int currentPrice = ui->tableWidget->item(currentRow, 5)->text().toInt();
 
     bool ok;
 
@@ -141,23 +145,162 @@ void MainWindow::editProduct()
     int totalPrice = totalInStock * price;
     int revenue = sold * price;
 
-    table->item(currentRow, 0)->setText(product);
-    table->item(currentRow, 1)->setText(supplier);
-    table->item(currentRow, 2)->setText(QString::number(received));
-    table->item(currentRow, 3)->setText(QString::number(sold));
-    table->item(currentRow, 4)->setText(QString::number(totalInStock));
-    table->item(currentRow, 5)->setText(QString::number(price));
-    table->item(currentRow, 6)->setText(QString::number(totalPrice));
-    table->item(currentRow, 7)->setText(QString::number(revenue));
+    ui->tableWidget->item(currentRow, 0)->setText(product);
+    ui->tableWidget->item(currentRow, 1)->setText(supplier);
+    ui->tableWidget->item(currentRow, 2)->setText(QString::number(received));
+    ui->tableWidget->item(currentRow, 3)->setText(QString::number(sold));
+    ui->tableWidget->item(currentRow, 4)->setText(QString::number(totalInStock));
+    ui->tableWidget->item(currentRow, 5)->setText(QString::number(price));
+    ui->tableWidget->item(currentRow, 6)->setText(QString::number(totalPrice));
+    ui->tableWidget->item(currentRow, 7)->setText(QString::number(revenue));
+
+    markDataChanged();
 }
 
-void MainWindow::help()
+void MainWindow::showHelp()
 {
     QMessageBox::about(this, "О программе",
-        "Данная программа представляет собой приложение для складского учета\n"
+                       "Данная программа представляет собой приложение для складского учета\n"
                        "С помощью нее вы можеет:\n"
                        "1) Добавить товар и всю информацию о нем(Название, поставщика, количество поступившего/проданного товара и цену, все остальное высчитватся автоматичски)\n"
                        "2) Редактирование данных о товаре\n"
                        "3) Удаления товара из списка\n\n"
                        "Функции будут пополняться");
+}
+
+void MainWindow::saveToFile()
+{
+    QString fileName = QFileDialog::getSaveFileName(this, "Сохранить файл", "", "Текстовые файлы (*.txt)");
+
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "Ошибка", "Не удалось открыть файл для записи");
+        return;
+    }
+
+    QTextStream out(&file);
+    out.setCodec("UTF-8");
+
+    for (int col = 0; col < ui->tableWidget->columnCount(); ++col) {
+        out << ui->tableWidget->horizontalHeaderItem(col)->text();
+        if (col < ui->tableWidget->columnCount() - 1) {
+            out << "\t";
+        }
+    }
+    out << "\n";
+
+    for (int row = 0; row < ui->tableWidget->rowCount(); ++row) {
+        for (int col = 0; col < ui->tableWidget->columnCount(); ++col) {
+            QTableWidgetItem *item = ui->tableWidget->item(row, col);
+            if (item) {
+                out << item->text();
+            }
+            if (col < ui->tableWidget->columnCount() - 1) {
+                out << "\t";
+            }
+        }
+        out << "\n";
+    }
+
+    file.close();
+    markDataSaved();
+    QMessageBox::information(this, "Успех", "Данные успешно сохранены в файл");
+}
+
+void MainWindow::loadFromFile()
+{
+    if (dataChanged) {
+        QMessageBox::StandardButton reply;
+        reply = QMessageBox::question(this, "Несохраненные изменения","У вас есть несохраненные изменения.\n""Сохранить перед загрузкой нового файла?",
+                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+
+        if (reply == QMessageBox::Save) {
+            saveToFile();
+            if (dataChanged) return;
+        } else if (reply == QMessageBox::Cancel) {
+            return;
+        }
+    }
+
+    QString fileName = QFileDialog::getOpenFileName(this, "Открыть файл", "", "Текстовые файлы (*.txt)");
+
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "Ошибка", "Не удалось открыть файл для чтения");
+        return;
+    }
+
+    ui->tableWidget->setRowCount(0);
+
+    QTextStream in(&file);
+    in.setCodec("UTF-8");
+
+    int lineNumber = 0;
+    while (!in.atEnd()) {
+        QString line = in.readLine();
+        if (lineNumber == 0) {
+            lineNumber++;
+            continue;
+        }
+
+        if (!line.isEmpty()) {
+            QStringList fields = line.split("\t");
+
+            if (fields.size() >= 8) {
+                int row = ui->tableWidget->rowCount();
+                ui->tableWidget->insertRow(row);
+
+                for (int col = 0; col < qMin(fields.size(), ui->tableWidget->columnCount()); ++col) {
+                    ui->tableWidget->setItem(row, col, new QTableWidgetItem(fields[col]));
+                }
+            }
+        }
+
+        lineNumber++;
+    }
+
+    file.close();
+    markDataSaved();
+    QMessageBox::information(this, "Успех", "Данные успешно загружены из файла");
+}
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    if (dataChanged) {
+        QMessageBox::StandardButton reply;
+        reply = QMessageBox::question(this, "Несохраненные изменения","У вас есть несохраненные изменения.\n""Сохранить перед выходом?",
+                                      QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+
+        if (reply == QMessageBox::Save) {
+            saveToFile();
+            if (dataChanged) {
+                event->ignore();
+                return;
+            }
+            event->accept();
+        } else if (reply == QMessageBox::Discard) {
+            event->accept();
+        } else { // Cancel
+            event->ignore();
+        }
+    } else {
+        event->accept();
+    }
+}
+
+void MainWindow::markDataChanged()
+{
+    dataChanged = true;
+}
+
+void MainWindow::markDataSaved()
+{
+    dataChanged = false;
 }

@@ -3,27 +3,35 @@
 
 #include <QMainWindow>
 
-class QTableWidget;
-class QMenu;
+namespace Ui {
+class MainWindow;
+}
 
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent = nullptr);
+    explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow();
+
+protected:
+    void closeEvent(QCloseEvent *event) override;  // Добавлено
 
 private slots:
     void addProduct();
     void deleteProduct();
     void editProduct();
-    void help();
+    void showHelp();
+    void saveToFile();
+    void loadFromFile();
 
 private:
-    void setupUI();
-    void setupTable();
+    Ui::MainWindow *ui;
+    bool dataChanged = false;
 
-    QTableWidget *table;
+    void markDataChanged();
+    void markDataSaved();
 };
 
-#endif
+#endif // MAINWINDOW_H

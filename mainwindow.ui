@@ -6,20 +6,71 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>600</height>
+    <width>1168</width>
+    <height>766</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
-  <widget class="QWidget" name="centralwidget"/>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QTableWidget" name="tableWidget">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>0</y>
+      <width>1141</width>
+      <height>721</height>
+     </rect>
+    </property>
+    <column>
+     <property name="text">
+      <string>Товар</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>Поставщик</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>Прибыло на склад, шт</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>Продано, шт</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>Всего на складе, шт</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>Цена, р</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>Общая стоимость, р</string>
+     </property>
+    </column>
+    <column>
+     <property name="text">
+      <string>Выручка с продажи, р</string>
+     </property>
+    </column>
+   </widget>
+  </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
+     <width>1168</width>
      <height>21</height>
     </rect>
    </property>
